@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="aws-sdk-2.301.0.min.js"></script>
+  <script type="text/javascript">
+
+  function hi(){
+    // AWS.config.region = 'us-east-1'; // Region
+    // AWS.config.accessKeyId = "AKIAJGDUB7JKXVUASILQ"
+    // AWS.config.secretAccessKey = "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"
+    AWS.config.update({
+      accessKeyId: "AKIAJGDUB7JKXVUASILQ",
+      secretAccessKey: "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",
+      "region": "us-east-1"
+    });
+    var comprehend = new AWS.Comprehend();
+    originalText = document.getElementById("raw_text").value;
+    var params = {
+      LanguageCode: "en", /* required */
+      Text: originalText /* required */
+    };
+    comprehend.detectEntities(params, function (err, data) {
+      if (err) console.log(err, err.stack); // an error occurred
+      else
+        //remove special chars before querying Comprehend API
+        originalText = originalText.replace(new RegExp(/[,;:.)(\[\]\"/\\]/, 'g'), "");
+        awsNormalizedText = comprehendNormalize(originalText, data);
+        // awsNormalizedText = original_text;
+        fullyNormalizedText = searchReplaceNormalization(awsNormalizedText);
+        console.log("***********")
+        console.log("***********")
+        console.log(fullyNormalizedText);
+        document.getElementById("response").innerHTML = fullyNormalizedText;
+    });
+
+  }
+
+  function comprehendNormalize(originalText, data){
+    entityArr = data["Entities"];
+    for(var i = 0; i<entityArr.length; i++){
+      entity = entityArr[i]["Type"]
+      if(entity != "OTHER"){
+        normalizedText = "["+entity.toLowerCase()+"]";
+        text = entityArr[i]["Text"];
+        originalText = originalText.replace(text, normalizedText);
+      }
+    }
+    return originalText;
+  }
+
+  function searchReplaceNormalization(originalText){
+    originalText = originalText.replace(new RegExp("'m", 'g'), " am");
+    originalText = originalText.replace(new RegExp("'re", 'g'), " are");
+    originalText = originalText.replace(new RegExp("'ll", 'g'), " will");
+    originalText = originalText.replace(new RegExp("'ve", 'g'), " have");
+    originalText = originalText.replace(new RegExp("won't", 'g'), " will not");
+    originalText = originalText.replace(new RegExp("doesn't", 'g'), " does not");
+    originalText = originalText.replace(new RegExp("'d", 'g'), " would");
+    originalText = originalText.replace(new RegExp(/[0-9]+/, 'g'), "[number]");
+    originalText = originalText.replace(new RegExp(/(why |who |where |what |when )/, 'gi'), "[wwhh] ");
+    originalText = originalText.replace(new RegExp(/(after|during|before)/, 'gi'), "[aaafter]");
+    //careful not to overmatch, "*" is end-of=line character
+    originalText = originalText.replace(new RegExp(/( we | you[ *]| he | she | they )/, 'gi'), " [name] ");
+    originalText = originalText.replace(new RegExp(/(I |We |You |He |She |They )/, 'g'), "[person] ");
+    originalText = originalText.replace(new RegExp(/( me[ *]| us[ *]| them[ *])/, 'g'), " [pronoun-object] ");
+    return originalText.replace(new RegExp(/[*]/, 'g'), "");;
+  }
+  </script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+<body>
+  <div>
+    <textarea rows ="9" cols = "20" id="raw_text" placeholder= "Message" style = "font-size: 14px;"></textarea>
+    <button type="submit" onclick="hi()">Submit</button>
+  </div>
+  <div>
+    <p id = "response"></p>
+  </div>
+</body>
+</html>
