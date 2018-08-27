@@ -22,7 +22,7 @@
       if (err) console.log(err, err.stack); // an error occurred
       else
         //remove special chars before querying Comprehend API
-        originalText = originalText.replace(new RegExp(/[,;:.)(\[\]\"/\\]/, 'g'), "");
+        originalText = originalText.replace(new RegExp(/[,;.)(\[\]\"/\\]/, 'g'), "");
         awsNormalizedText = comprehendNormalize(originalText, data);
         // awsNormalizedText = original_text;
         fullyNormalizedText = searchReplaceNormalization(awsNormalizedText);
@@ -38,16 +38,19 @@
     entityArr = data["Entities"];
     for(var i = 0; i<entityArr.length; i++){
       entity = entityArr[i]["Type"]
-      if(entity != "OTHER"){
-        normalizedText = "["+entity.toLowerCase()+"]";
+      if(entity == "PERSON"){
         text = entityArr[i]["Text"];
-        originalText = originalText.replace(text, normalizedText);
+        originalText = originalText.replace(text, "[pronoun-object]");
+      }else if(entity == "DATE"){
+        text = entityArr[i]["Text"];
+        originalText = originalText.replace(text, "[date]");
       }
     }
     return originalText;
   }
 
   function searchReplaceNormalization(originalText){
+
     originalText = originalText.replace(new RegExp("'m", 'g'), " am");
     originalText = originalText.replace(new RegExp("'re", 'g'), " are");
     originalText = originalText.replace(new RegExp("'ll", 'g'), " will");
@@ -59,9 +62,10 @@
     originalText = originalText.replace(new RegExp(/(why |who |where |what |when )/, 'gi'), "[wwhh] ");
     originalText = originalText.replace(new RegExp(/(after|during|before)/, 'gi'), "[aaafter]");
     //careful not to overmatch, "*" is end-of=line character
-    originalText = originalText.replace(new RegExp(/( we | you[ *]| he | she | they )/, 'gi'), " [name] ");
-    originalText = originalText.replace(new RegExp(/(I |We |You |He |She |They )/, 'g'), "[person] ");
+    originalText = originalText.replace(new RegExp(/( we | you[ *]| he | she | they )/, 'gi'), " [pronoun-subject] ");
+    originalText = originalText.replace(new RegExp(/(I |We |You |He |She |They )/, 'g'), "[pronoun-subject] ");
     originalText = originalText.replace(new RegExp(/( me[ *]| us[ *]| them[ *])/, 'g'), " [pronoun-object] ");
+    //delete EOL characters
     return originalText.replace(new RegExp(/[*]/, 'g'), "");;
   }
   </script>
