@@ -1,19 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="aws-sdk-2.301.0.min.js"></script>
+  <script src="aws-sdk-2.302.0.min.js"></script>
   <script type="text/javascript">
 
   function hi(){
     // AWS.config.region = 'us-east-1'; // Region
     // AWS.config.accessKeyId =
     // AWS.config.secretAccessKey =
+    //set up credenitals
     AWS.config.update({
 
       "region": "us-east-1"
     });
+
+    //normalize and clean the input text
     var comprehend = new AWS.Comprehend();
     originalText = document.getElementById("raw_text").value;
+    fullyNormalizedText = originalText;
     var params = {
       LanguageCode: "en", /* required */
       Text: originalText /* required */
@@ -29,7 +33,28 @@
         console.log("***********")
         console.log("***********")
         console.log(fullyNormalizedText);
-        document.getElementById("response").innerHTML = fullyNormalizedText;
+    });
+
+    //classify the original text
+    var machinelearning = new AWS.MachineLearning();
+    var params = {
+      MLModelId: 'ml-oCgsvtc0xpK', /* required */
+      PredictEndpoint: 'https://realtime.machinelearning.us-east-1.amazonaws.com', /* required */
+      Record: { /* required */
+        'Var2': originalText
+        /* '<VariableName>': ... */
+      }
+    };
+    machinelearning.predict(params, function(err, data) {
+      if (err) console.log(err, err.stack); // an error occurred
+      else
+        console.log(data);
+        var classification = data["Prediction"]["predictedLabel"]
+        var score = data["Prediction"]["predictedScores"][classification];
+        console.log(classification);
+        console.log(score);
+        document.getElementById("classification").innerHTML = "Classification: "+classification;
+        document.getElementById("score").innerHTML = "Confidence: "+score;
     });
 
   }
@@ -40,7 +65,7 @@
       entity = entityArr[i]["Type"]
       if(entity == "PERSON"){
         text = entityArr[i]["Text"];
-        originalText = originalText.replace(text, "[pronoun-object]");
+        originalText = originalText.replace(text, "[name]");
       }else if(entity == "DATE"){
         text = entityArr[i]["Text"];
         originalText = originalText.replace(text, "[date]");
@@ -62,7 +87,7 @@
     originalText = originalText.replace(new RegExp(/(why |who |where |what |when )/, 'gi'), "[wwhh] ");
     originalText = originalText.replace(new RegExp(/(after|during|before)/, 'gi'), "[aaafter]");
     //careful not to overmatch, "*" is end-of=line character
-    originalText = originalText.replace(new RegExp(/( we | you[ *]| he | she | they )/, 'gi'), " [pronoun-subject] ");
+    originalText = originalText.replace(new RegExp(/( we | you[ *]| he | she | they )/, 'gi'), " [pronoun] ");
     originalText = originalText.replace(new RegExp(/(I |We |You |He |She |They )/, 'g'), "[pronoun-subject] ");
     originalText = originalText.replace(new RegExp(/( me[ *]| us[ *]| them[ *])/, 'g'), " [pronoun-object] ");
     //delete EOL characters
@@ -77,7 +102,8 @@
     <button type="submit" onclick="hi()">Submit</button>
   </div>
   <div>
-    <p id = "response"></p>
+    <p id = "classification"></p>
+    <p id = "score"></p>
   </div>
 </body>
 </html>
