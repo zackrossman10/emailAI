@@ -4,68 +4,36 @@
   <script src="aws-sdk-2.302.0.min.js"></script>
   <script type="text/javascript">
 
-  function hi(){
-    // AWS.config.region = 'us-east-1'; // Region
-    // AWS.config.accessKeyId =
-    // AWS.config.secretAccessKey =
+  function predict(){
     //set up credenitals
     AWS.config.update({
 
       "region": "us-east-1"
     });
 
-    //normalize and clean the input text
+    //normalize the data with feature processing
     var comprehend = new AWS.Comprehend();
     var originalText = document.getElementById("raw_text").value;
-    //remove special chars before querying Comprehend API
     originalText = originalText.replace(new RegExp(/[,;.)(\"/\\]/, 'g'), "");
     var params = {
-      LanguageCode: "en", /* required */
-      Text: originalText /* required */
+      LanguageCode: "en",
+      Text: originalText
     };
+    //identify entities in the text with AWS Comprehend
     comprehend.detectEntities(params, function (err, data) {
       if (err) console.log(err, err.stack); // an error occurred
       else
+        //replace "PERSON" and "DATE" entities identified by AWS Comprehend
         var awsNormalizedText = comprehendNormalize(originalText, data);
-        var fullyNormalizedText = searchReplaceNormalization(awsNormalizedText);
-        console.log("***********")
-        console.log("***********")
-        console.log(fullyNormalizedText);
-        predict(fullyNormalizedText);
+        //further normalize the text with simple regexes/matching
+        var fullyNormalizedText = searchReplaceNormalize(awsNormalizedText);
+        //classify the normalized text with AWS ML
+        getPrediction(fullyNormalizedText);
     });
   }
 
-  function predict(fullyNormalizedText){
-    var machinelearning = new AWS.MachineLearning();
-    var containsDate = fullyNormalizedText.indexOf("[date]") > -1 ? '1' : '0';
-    var containsQuestion = fullyNormalizedText.indexOf('?') > -1 ? '1' : '0';
-    console.log(containsDate + ": "+containsQuestion);
-    var params = {
-      MLModelId: 'ml-mUXyHTyRl21', /* required */
-      PredictEndpoint: 'https://realtime.machinelearning.us-east-1.amazonaws.com', /* required */
-      Record: { /* required */
-        'Var2': fullyNormalizedText,
-        'Var3' : containsDate,
-        'Var4' : containsQuestion
-      }
-    };
-    machinelearning.predict(params, function(err, data) {
-      if (err) console.log(err, err.stack); // an error occurred
-      else
-        var classifications = ["Descriptive content", "Action Items", "Other (salutation, non-work)", "Contact Info", "Event", "Inquiry/Question"];
-        var classification = data["Prediction"]["predictedLabel"]
-        var scores = data["Prediction"]["predictedScores"];
-        console.log(data);
-        classifications.forEach(function(classification){
-          console.log(classification+": "+scores[classification]);
-        });
-        // console.log(classification);
-        // console.log(score);
-        document.getElementById("classification").innerHTML = "Classification: "+classification;
-        document.getElementById("score").innerHTML = "Confidence: "+scores[classification];
-    });
-  }
-
+  //replace "PERSON" and "DATE" entities identified by AWS Comprehend
+  //return the feature-processed text
   function comprehendNormalize(originalText, data){
     entityArr = data["Entities"];
     for(var i = 0; i<entityArr.length; i++){
@@ -81,8 +49,7 @@
     return originalText;
   }
 
-  function searchReplaceNormalization(originalText){
-
+  function searchReplaceNormalize(originalText){
     originalText = originalText.replace(new RegExp("'m", 'g'), " am");
     originalText = originalText.replace(new RegExp("'re", 'g'), " are");
     originalText = originalText.replace(new RegExp("'ll", 'g'), " will");
@@ -101,13 +68,50 @@
     //delete EOL characters
     return originalText.replace(new RegExp(/[*]/, 'g'), "");;
   }
+
+  //classify the normalized text with AWS ML
+  function getPrediction(fullyNormalizedText){
+    var machinelearning = new AWS.MachineLearning();
+    //determine whether text contains a date or "?"
+    var containsDate = fullyNormalizedText.indexOf("[date]") > -1 ? '1' : '0';
+    var containsQuestion = fullyNormalizedText.indexOf('?') > -1 ? '1' : '0';
+    var params = {
+      MLModelId: 'ml-mUXyHTyRl21',
+      PredictEndpoint: 'https://realtime.machinelearning.us-east-1.amazonaws.com',
+      Record: {
+        'Var2': fullyNormalizedText, //text param
+        'Var3' : containsDate,       //date param
+        'Var4' : containsQuestion    //question-mark param
+      }
+    };
+    //get the predicted classification from the AWS ML instance
+    machinelearning.predict(params, function(err, data) {
+      if (err) console.log(err, err.stack); // an error occurred
+      else
+        //display the predicted classification and score on webpage
+        var classification = data["Prediction"]["predictedLabel"]
+        var score = data["Prediction"]["predictedScores"][classification]
+        document.getElementById("classification").innerHTML = "Classification: "+classification;
+        document.getElementById("score").innerHTML = "Confidence: "+score;
+    });
+  }
+
+  //print scores for every classification
+  function printScores(data){
+    var classifications = ["Descriptive content", "Action Items", "Other (salutation, non-work)", "Contact Info", "Event", "Inquiry/Question"];
+    var scores = data["Prediction"]["predictedScores"];
+    classifications.forEach(function(classification){
+      console.log(classification+": "+scores[classification]);
+    });
+  }
+
   </script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 </head>
 <body>
   <div>
     <textarea rows ="9" cols = "20" id="raw_text" placeholder= "Message" style = "font-size: 14px;"></textarea>
-    <button type="submit" onclick="hi()">Submit</button>
+    <button type="submit" onclick="predict()">Submit</button>
   </div>
   <div>
     <p id = "classification"></p>
